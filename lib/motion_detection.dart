@@ -35,22 +35,22 @@ class PayloadWithImages {
 
 class DetectionData {
   final Image diffImage;
+  final Image morphImage;
   final int pixCount;
   final int whiteCount;
 
-  DetectionData(this.diffImage, this.pixCount, this.whiteCount);
+  DetectionData(
+      this.diffImage, this.morphImage, this.pixCount, this.whiteCount);
 }
 
 class MotionDetector {
   final worker = Worker();
 
-  int resetCounter = 0;
-
   Image? lastImage;
 
   bool _processing = false;
 
-  Function(Uint8List bytes)? _onSet;
+  Function(Uint8List bytes, double detected)? _onSet;
 
   Future<void> init() async {
     await worker.init(
@@ -60,12 +60,11 @@ class MotionDetector {
     );
   }
 
-  static DetectionData _detect(Image image, Image lastImage) {
-    final threshold = 10;
-    final currentImage = grayscale(image);
-    lastImage = grayscale(lastImage);
+  static DetectionData _detect(Image currentImage, Image lastImage) {
+    final threshold = 0.1;
 
     Image diffImage = Image(currentImage.width, currentImage.height);
+    // Image morphBg = Image(currentImage.width, currentImage.height);
     int count = 0;
     int whiteCount = 0;
     for (var x = 0; x < currentImage.width; x++) {
@@ -73,26 +72,30 @@ class MotionDetector {
         count++;
         final currentImagePixel = currentImage.getPixel(x, y);
         final lastImagePixel = lastImage.getPixel(x, y);
-
-        final a = 255;
         final b = getBlue(currentImagePixel) - getBlue(lastImagePixel);
         final g = getGreen(currentImagePixel) - getGreen(lastImagePixel);
         final r = getRed(currentImagePixel) - getRed(lastImagePixel);
 
-        final lum = getLuminance(Color.fromRgba(r.abs(), g.abs(), b.abs(), a));
+        final lum = getLuminanceRgb(r, g, b) / 255;
         if (lum > threshold) {
           diffImage.setPixel(x, y, 0xFFFFFFFF);
           whiteCount++;
         } else {
           diffImage.setPixel(x, y, 0xFF000000);
         }
+
+        // final morphColor = 0.75 * lastImagePixel + 0.25 * currentImagePixel;
+        // final morphColor = currentImagePixel;
+
+        // morphBg.setPixel(x, y, morphColor.toInt());
       }
     }
 
-    return DetectionData(copyRotate(diffImage, 90), count, whiteCount);
+    return DetectionData(
+        copyRotate(diffImage, 90), currentImage, count, whiteCount);
   }
 
-  void onGettingDiff(Function(Uint8List bytes) onSet) {
+  void onGettingDiff(Function(Uint8List bytes, double detected) onSet) {
     _onSet = onSet;
   }
 
@@ -104,26 +107,20 @@ class MotionDetector {
         return;
       }
 
-      resetCounter++;
-
       if (_onSet != null && data.bytes != null) {
-        if (data.detectionData != null) {
-          print(
-              "${(data.detectionData!.whiteCount / data.detectionData!.pixCount) * 100} %");
-          log("""
-          white: ${data.detectionData!.whiteCount}
-          black: ${data.detectionData!.pixCount - data.detectionData!.whiteCount}
-          total: ${data.detectionData!.pixCount}
-          \n
-          """);
-        }
-        _onSet!(data.bytes as Uint8List);
-      }
-    }
+        double detected = 0;
 
-    if (lastImage != null) {
-      lastImage = null;
-      resetCounter = 0;
+        if (data.detectionData != null) {
+          // log("white : ${data.detectionData!.whiteCount}");
+          // log("total : ${data.detectionData!.pixCount}");
+          detected =
+              (data.detectionData!.whiteCount / data.detectionData!.pixCount) *
+                  1000;
+        }
+        _onSet!(data.bytes as Uint8List, detected.roundToDouble());
+      }
+
+      lastImage = data.prev;
     }
   }
 
@@ -141,8 +138,8 @@ class MotionDetector {
 
       final png = PngEncoder().encodeImage(processed.diffImage);
 
-      recieverPort.send(
-          PayloadWithImages(processed.diffImage, data.prev!, png, processed));
+      recieverPort.send(PayloadWithImages(
+          processed.diffImage, processed.morphImage, png, processed));
     }
   }
 

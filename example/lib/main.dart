@@ -27,7 +27,7 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _ambiguate(WidgetsBinding.instance)?.addObserver(this);
-    controller = CameraController(cameras[0], ResolutionPreset.high);
+    controller = CameraController(cameras[0], ResolutionPreset.low);
     controller?.initialize().then((_) {
       if (!mounted) {
         return;
@@ -61,9 +61,8 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
 
     final CameraController cameraController = CameraController(
       cameraDescription,
-      ResolutionPreset.high,
+      ResolutionPreset.low,
       enableAudio: true,
-      imageFormatGroup: ImageFormatGroup.jpeg,
     );
 
     controller = cameraController;
@@ -113,7 +112,6 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
               width: 240,
               height: 360,
               child: DetectorPreview(detector: detector),
-              color: Colors.red,
             ),
           )
         ],
@@ -132,6 +130,7 @@ class DetectorPreview extends StatefulWidget {
 
 class _DetectorPreviewState extends State<DetectorPreview> {
   Uint8List? _bytes;
+  double _detected = 0;
 
   @override
   void initState() {
@@ -140,15 +139,42 @@ class _DetectorPreviewState extends State<DetectorPreview> {
     widget.detector.onGettingDiff(updateImage);
   }
 
-  updateImage(Uint8List bytes) {
+  updateImage(Uint8List bytes, double detected) {
     setState(() {
       _bytes = bytes;
+      _detected = detected;
     });
+
+    // print(_detected);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_bytes != null) return Image.memory(_bytes!);
+    if (_bytes != null)
+      return Material(
+        child: Stack(
+          children: [
+            Positioned.fill(
+                child: Image.memory(
+              _bytes!,
+              gaplessPlayback: true,
+            )),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Text(
+                "Motion $_detected",
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 18.0,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            )
+          ],
+        ),
+      );
     return Container();
   }
 }
