@@ -125,15 +125,15 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
             bottom: 20,
             right: 20,
             child: GestureDetector(
-              onTap: () {
-                threshold += 0.1;
-              },
-              child: Container(
-                width: 100,
-                height: 100,
-                color: Colors.black,
-              ),
-            ),
+                onTap: () {
+                  threshold += 0.1;
+                },
+                child: FloatingActionButton(
+                  onPressed: () {
+                    threshold += 0.1;
+                  },
+                  child: Icon(Icons.add),
+                )),
           ),
           // till here
         ],
