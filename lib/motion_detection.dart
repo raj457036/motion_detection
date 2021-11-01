@@ -57,10 +57,6 @@ class MotionDetector {
 
   bool _isMotionIsActive = false;
 
-  // MotionDetector(void _callBackFunction) {
-  //   this._callBackFunction = _callBackFunction;
-  // }
-
   Future<void> init(void Function() _callBackFunction) async {
     this._callBackFunction = _callBackFunction;
     await worker.init(
