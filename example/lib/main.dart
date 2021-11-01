@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter/services.dart';
 import 'package:motion_detection/motion_detection.dart';
 
 late List<CameraDescription> cameras;
@@ -23,6 +22,12 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
   CameraController? controller;
   final MotionDetector detector = MotionDetector();
 
+  double threshold = 0.1;
+
+  void _callback() {
+    print('call back function was called');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,8 +38,9 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
         return;
       }
       setState(() {});
-      detector.init().then((_) {
-        controller?.startImageStream(detector.onLatestImageAvailable);
+      detector.init(_callback).then((_) {
+        controller?.startImageStream(
+            (image) => detector.onLatestImageAvailable(image, threshold));
       });
     });
   }
@@ -113,7 +119,23 @@ class _CameraAppState extends State<CameraApp> with WidgetsBindingObserver {
               height: 360,
               child: DetectorPreview(detector: detector),
             ),
-          )
+          ),
+          // comment this line only for testing for increasing threshold
+          Positioned(
+            bottom: 20,
+            right: 20,
+            child: GestureDetector(
+              onTap: () {
+                threshold += 0.1;
+              },
+              child: Container(
+                width: 100,
+                height: 100,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          // till here
         ],
       ),
     );

@@ -1,6 +1,5 @@
 library motion_detection;
 
-import 'dart:developer';
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -12,9 +11,11 @@ import 'package:motion_detection/utils/converters.dart';
 class PayloadWithCameraImage {
   final Image? prev;
   final CameraImage current;
+  final double threshold;
 
   PayloadWithCameraImage(
-    this.current, [
+    this.current,
+    this.threshold, [
     this.prev,
   ]);
 }
@@ -52,7 +53,16 @@ class MotionDetector {
 
   Function(Uint8List bytes, double detected)? _onSet;
 
-  Future<void> init() async {
+  late void Function() _callBackFunction;
+
+  bool _isMotionIsActive = false;
+
+  // MotionDetector(void _callBackFunction) {
+  //   this._callBackFunction = _callBackFunction;
+  // }
+
+  Future<void> init(void Function() _callBackFunction) async {
+    this._callBackFunction = _callBackFunction;
     await worker.init(
       _inMain,
       _inIsolate,
@@ -60,9 +70,9 @@ class MotionDetector {
     );
   }
 
-  static DetectionData _detect(Image currentImage, Image lastImage) {
-    final threshold = 0.1;
-
+  static DetectionData _detect(
+      Image currentImage, Image lastImage, double threshold) {
+    print('threshold value: ' + threshold.toString());
     Image diffImage = Image(currentImage.width, currentImage.height);
     // Image morphBg = Image(currentImage.width, currentImage.height);
     int count = 0;
@@ -117,7 +127,17 @@ class MotionDetector {
               (data.detectionData!.whiteCount / data.detectionData!.pixCount) *
                   1000;
         }
-        _onSet!(data.bytes as Uint8List, detected.roundToDouble());
+
+        final motionDetectedValue = detected.roundToDouble();
+
+        _onSet!(data.bytes as Uint8List, motionDetectedValue);
+
+        if (motionDetectedValue > 20 && !_isMotionIsActive) {
+          _callBackFunction();
+          _isMotionIsActive = true;
+        } else if (motionDetectedValue == 0 && _isMotionIsActive) {
+          _isMotionIsActive = false;
+        }
       }
 
       lastImage = data.prev;
@@ -134,7 +154,7 @@ class MotionDetector {
         return;
       }
 
-      final processed = _detect(image!, data.prev!);
+      final processed = _detect(image!, data.prev!, data.threshold);
 
       final png = PngEncoder().encodeImage(processed.diffImage);
 
@@ -143,10 +163,12 @@ class MotionDetector {
     }
   }
 
-  onLatestImageAvailable(CameraImage cameraImage) async {
+  onLatestImageAvailable(CameraImage cameraImage, double? threshold) async {
     if (_processing) return;
+    if (threshold == null) threshold = 0.1;
     _processing = true;
-    worker.sendMessage(PayloadWithCameraImage(cameraImage, lastImage));
+    worker
+        .sendMessage(PayloadWithCameraImage(cameraImage, threshold, lastImage));
   }
 
   dispose() {
